@@ -1,46 +1,46 @@
-# 顺丰多合一（SF Multi-in-One）
+# sf-duoheyi (SF Multi-in-One)
 
-一份能跑的顺丰速运积分全合一脚本（青龙面板），由社区四份**明文**脚本合并去重而成：日常积分任务、双端签到、采蜜换大礼、会员日、节日活动，一个文件全包。
+A working all-in-one SF Express points script for the QingLong panel, merged and deduplicated from four community **plaintext** scripts: daily points tasks, dual-platform sign-in, Honey Harvest, Member Day, and festival events — all in a single file.
 
-## 为什么用这一份
+## Why this one
 
-- **100% 明文，逐行可审计**：没有加密载荷、没有混淆打包、没有运行时下载的二进制。每一行代码都摊开给你看，下单之前先读代码，这是这类脚本最基本的体面。
-- **零后台服务器，凭证不出本机**：签名（MD5）在本地计算；你的 CK 只发往顺丰官方接口。不经过任何作者的服务器中转，不用去第三方网站「扫码取码」——那等于把账号交给陌生人。
-- **只连一个官方域名**：全文网络请求只指向 `mcs-mimp-web.sf-express.com`。不信可以自己验证：`grep -oE 'https?://[^" ]+' 顺丰多合一.py | sort -u`，结果只有一个域名。
-- **活动覆盖全**：四份脚本的接口取并集（共 25 个端点），同类项只保留一份最新实现，不再需要同时挂三四个顺丰脚本互相打架。
-- **模块独立开关 + 日期门控**：会员日只在每月 26–28 号自动运行，节日活动按窗口期自动启停，过期活动默认关闭，不会天天报错刷日志。
-- **多账号 + 代理体系**：多账号并行、单账号异常隔离；每个账号可单独绑代理，也支持动态代理提取 API，出错自动换 IP 重试。
-- **CK 失效可识别**：登录态过期会明确报「CK失效了」，不会静默失败让你以为任务跑了。
+- **100% plaintext, auditable line by line**: no encrypted payloads, no obfuscated packaging, no binaries downloaded at runtime. Every line of code is laid out for you to read — read the code before you run it; that is the bare minimum for this kind of script.
+- **Zero backend servers, credentials never leave your machine**: signatures (MD5) are computed locally; your CK is sent only to SF Express's official APIs. Nothing is relayed through any author's server, and there is no need to use a third-party "scan-to-get-CK" website — that is handing your account to a stranger.
+- **Connects to exactly one official domain**: every network request in the file goes to `mcs-mimp-web.sf-express.com`. Don't take our word for it — verify it yourself: `grep -oE 'https?://[^" ]+' sf-duoheyi.py | sort -u` returns exactly one domain.
+- **Full event coverage**: the union of all four scripts' APIs (25 endpoints in total); for each category only the newest implementation is kept, so you no longer need three or four SF scripts running at once and fighting each other.
+- **Independent module switches + date gating**: Member Day runs automatically only on the 26th–28th of each month, festival events start and stop with their event windows, and expired events are off by default instead of spamming your logs with errors every day.
+- **Multi-account + proxy system**: accounts run in parallel with per-account exception isolation; each account can have its own proxy, and a dynamic proxy extraction API is supported with automatic IP rotation and retry on errors.
+- **CK expiry is detected**: when your login state expires, the script clearly reports "CK expired" instead of failing silently and leaving you thinking the tasks ran.
 
-## 功能清单
+## Features
 
-| 模块 | 内容 | 默认 |
+| Module | Contents | Default |
 |---|---|---|
-| 每日签到 | App + 小程序双端签到、App 待领礼包 | 开 |
-| 日常积分任务 | 浏览/互动/特权福利等全量日常任务，逐个失败隔离，最后统一领积分 | 开 |
-| 采蜜换大礼 | 采蜜任务、收丰蜜、大冒险、容器扩容、领券（`SF_HONEY`） | 开（活动未开始时自动跳过） |
-| 会员日 | 每月 26–28 号：会员日任务、抽奖、红包合成与提取、整点红包（`SF_MEMBER_DAY`） | 开（非窗口期自动跳过） |
-| 节日活动框架 | 世界杯模块（2026 年 7 月已过期，`SF_WORLD_CUP`） | 关 |
+| Daily sign-in | App + Mini Program dual-platform sign-in, pending App gift packs | On |
+| Daily points tasks | The full set of daily tasks (browsing / interaction / privilege benefits, etc.), each isolated on failure, points claimed together at the end | On |
+| Honey Harvest | Honey tasks, honey collection, adventure game, container expansion, coupon claiming (`SF_HONEY`) | On (auto-skipped when the event has not started) |
+| Member Day | On the 26th–28th of each month: Member Day tasks, lottery, red-packet merging and withdrawal, hourly red packets (`SF_MEMBER_DAY`) | On (auto-skipped outside the window) |
+| Festival event framework | World Cup module (expired in July 2026, `SF_WORLD_CUP`) | Off |
 
-## 使用方法
+## Usage
 
-1. 青龙面板新建脚本，把 `顺丰多合一.py` 放进去，或订阅本仓库。
-2. 环境变量 `sfsyUrl`（必填）：填账号 CK 串或登录 URL。多账号用 `&`、英文逗号、中文逗号或换行分隔；某个账号要走代理时，在它的 CK 后拼 `#代理地址`。
-   - CK 获取：用抓包工具打开顺丰速运 App / 小程序「我的-积分」相关请求，取 Cookie 中的 `sessionId`、`_login_mobile_`、`_login_user_id_` 拼接即可。**请手动抓包，不要使用任何「扫码获取 CK」的第三方网站。**
-3. 可选变量：`SF_PROXY_API_URL`（动态代理提取链接）、`SF_PROXY_TYPE`（http/socks5，默认 socks5）、`SFSY_PUSH`（推送开关）等，详见脚本文件头注释。
-4. 定时建议：`11 6-18/3 * * *`，或每天 0 点、12 点各一次。
+1. Create a new script in the QingLong panel and put `sf-duoheyi.py` in it, or subscribe to this repository.
+2. Environment variable `sfsyUrl` (required): your account CK string or login URL. Separate multiple accounts with `&`, an English comma, a Chinese comma, or newlines; to route one account through a proxy, append `#proxy` after its CK.
+   - How to get your CK: use a packet-capture tool on requests from the SF Express App / Mini Program (e.g. the "My Points" pages) and concatenate `sessionId`, `_login_mobile_`, and `_login_user_id_` from the Cookie. **Capture packets manually — never use any third-party "scan-to-get-CK" website.**
+3. Optional variables: `SF_PROXY_API_URL` (dynamic proxy extraction URL), `SF_PROXY_TYPE` (http/socks5, default socks5), `SFSY_PUSH` (push switch), etc. — see the header comment of the script for details.
+4. Suggested schedule: `11 6-18/3 * * *`, or twice a day at 00:00 and 12:00.
 
-## 来源与致谢
+## Sources & credits
 
-本脚本合并自以下开源明文脚本（保留了各模块的来源注释，可在代码中追溯）：
+This script is merged from the following open-source plaintext scripts (per-module source comments are kept in the code so everything stays traceable):
 
-- [ShuiLiZe/QingLong](https://github.com/ShuiLiZe/QingLong)《顺丰速运.py》—— 主骨架（日常任务、签到、会员日、代理体系）
-- [Qcby/QcbyScript](https://github.com/Qcby/QcbyScript)《顺丰速运.py》—— 多分隔符账号解析、异常兜底
-- [smallfawn/QLScriptPublic](https://github.com/smallfawn/QLScriptPublic)《daily/sfsy.py》—— 日常任务同源实现对照
-- [agluo/ql-script-hub](https://github.com/agluo/ql-script-hub)《SFSU_checkin.py》—— 采蜜换大礼、整点红包
+- [ShuiLiZe/QingLong](https://github.com/ShuiLiZe/QingLong) "顺丰速运.py" — the core framework (daily tasks, sign-in, Member Day, proxy system)
+- [Qcby/QcbyScript](https://github.com/Qcby/QcbyScript) "顺丰速运.py" — multi-separator account parsing, exception fallback
+- [smallfawn/QLScriptPublic](https://github.com/smallfawn/QLScriptPublic) "daily/sfsy.py" — same-lineage daily-task implementation, kept as reference
+- [agluo/ql-script-hub](https://github.com/agluo/ql-script-hub) "SFSU_checkin.py" — Honey Harvest, hourly red packets
 
-感谢原作者们的开源工作。本仓库只做合并整理与持续维护：跟踪各源更新与顺丰新活动，合并后经语法检查、域名自查与真实账号实测才发布。
+Thanks to the original authors for their open-source work. This repository only merges, organizes, and maintains: it tracks updates from the sources and new SF Express events, and every release passes a syntax check, a domain audit, and a live test on a real account before being published.
 
-## 免责声明
+## Disclaimer
 
-本项目仅供学习交流与个人账号的日常任务自动化，与顺丰官方无关。使用自动化脚本可能违反平台规则，账号风险自担；请勿用于商业用途或批量牟利。
+This project is for study, exchange, and automating daily tasks on your own personal account only, and is not affiliated with SF Express. Using automation scripts may violate platform rules; you bear the account risk yourself. Do not use it for commercial purposes or bulk profit.
