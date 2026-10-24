@@ -214,7 +214,7 @@ class Logger:
         self.lock = Lock()
 
     def _log(self, icon: str, msg: str):
-        line = f"{icon} {msg}"
+        line = f"{icon} [{datetime.now().strftime('%H:%M:%S')}] {msg}"
         with print_lock:
             print(line)
         with self.lock:
