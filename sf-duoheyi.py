@@ -622,6 +622,21 @@ class DailyTaskExecutor:
         mini_ok = self._sign_v2('MINI_PROGRAM')
         return app_ok or mini_ok
 
+    def query_balance(self):
+        """Current points balance via a single-channel task-list query.
+
+        Channel '1' responses carry totalPoint; one request only, so a
+        per-task measurement stays cheap. Returns int or None.
+        """
+        url = 'https://mcs-mimp-web.sf-express.com/mcs-mimp/commonPost/~memberNonactivity~integralTaskStrategyService~queryPointTaskAndSignFromES'
+        try:
+            resp = self.http.request(url, {'channelType': '1', 'deviceId': self.generate_device_id()})
+            if resp and resp.get('success') and resp.get('obj'):
+                return int(resp['obj'].get('totalPoint') or 0)
+        except (TypeError, ValueError):
+            pass
+        return None
+
     def get_task_list(self) -> List[Dict]:
         url = 'https://mcs-mimp-web.sf-express.com/mcs-mimp/commonPost/~memberNonactivity~integralTaskStrategyService~queryPointTaskAndSignFromES'
         all_tasks = []
@@ -709,7 +724,13 @@ class DailyTaskExecutor:
         return False
 
     def _run_one_task(self, task: Dict):
-        """Run a single daily task (split out of run in the merged version: per-task try isolation, one failure does not affect the rest)"""
+        """Run a single daily task (split out of run in the merged version: per-task try isolation, one failure does not affect the rest).
+
+        Returns True when the task actually executed an API call
+        (finishTask / fetchIntegral), so the caller can measure the
+        points balance right after it. Already-done, manual and
+        skipped tasks return False.
+        """
         title = task.get('title', 'Unknown')
         status = task.get('status')
         try:
@@ -717,45 +738,51 @@ class DailyTaskExecutor:
         except (TypeError, ValueError):
             pass
         if status == 3:
-            return
+            return False
         if title in DAILY_SKIP_TASKS:
             self._set_task_attrs(task)
             if status == 2 and self.taskCode and self.receive_task_reward():
-                return
+                return True
             self.logger.info(f'Manual task (must be completed in the Mini Program; auto-complete API not called): {title}')
-            return
+            return False
         self._set_task_attrs(task)
         if not self.taskCode:
             self.logger.info(f'No task code found, skipping: {title}')
-            return
+            return False
         self.logger.task(f'Task found: {title} (status: {status})')
         if '领任意生活特权福利' in title:
-            if self.handle_welfare_task():
+            welfare_ok = self.handle_welfare_task()
+            if welfare_ok:
                 time.sleep(2)
                 if self.execute_task():
                     time.sleep(2)
                     self.receive_task_reward()
             time.sleep(3)
-            return
+            return welfare_ok
         if status == 1:
             if '连签7天' in title and 'process' in task:
                 cur, tot = map(int, task['process'].split('/'))
                 if cur < tot:
                     self.logger.info(f'[{title}] Progress: {task["process"]}')
-                    return
+                    return False
             if self.execute_task():
                 self.logger.success(f'[{title}] Submitted successfully')
                 time.sleep(2)
                 status = 2
             else:
-                return
+                return False
         if status == 2:
             if self.receive_task_reward():
-                return
+                return True
             if self.execute_task():
                 time.sleep(2)
                 self.receive_task_reward()
+                time.sleep(3)
+                return True
+            time.sleep(3)
+            return False
         time.sleep(3)
+        return False
 
     def run(self) -> Tuple[int, int]:
         self.logger.info('Fetching daily task list...')
@@ -765,11 +792,27 @@ class DailyTaskExecutor:
             return 0, 0
         points_before = self.total_points
         self.logger.points(points_before, "Points before")
+        prev_bal = points_before
         for task in tasks:
             try:
-                self._run_one_task(task)
+                executed = self._run_one_task(task)
             except Exception as e:
                 self.logger.error(f'Task [{task.get("title", "Unknown")}] raised an exception and was skipped: {str(e)[:80]}')
+                executed = False
+            if executed:
+                bal = self.query_balance()
+                title = task.get('title', 'Unknown')
+                if bal is not None:
+                    delta = bal - prev_bal
+                    if delta > 0:
+                        self.logger.success(f'Task completed: {title}, current points: {bal} (+{delta})')
+                    elif delta < 0:
+                        self.logger.success(f'Task completed: {title}, current points: {bal} ({delta})')
+                    else:
+                        self.logger.success(f'Task completed: {title}, current points: {bal}')
+                    prev_bal = bal
+                else:
+                    self.logger.success(f'Task completed: {title}')
         tasks = self.get_task_list()
         points_after = self.total_points if tasks else points_before
         self.logger.points(points_after, "Points after")
