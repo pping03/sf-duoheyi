@@ -318,6 +318,27 @@ def get_api_proxy() -> Optional[Tuple[Dict[str, str], str]]:
         return None
 
 
+def lookup_egress_ip(proxy_dict) -> Tuple[Optional[str], Optional[str]]:
+    """Query the egress IP + geo through the same proxy used for login.
+
+    One request to ipinfo.io (HTTPS, no key). Under a rotating proxy the
+    returned IP is the egress observed right after login, which may differ
+    from the exact IP of the login request itself. Never raises: on any
+    failure returns (None, None) so the account run is unaffected.
+    """
+    try:
+        r = requests.get("https://ipinfo.io/json",
+                         proxies=proxy_dict if proxy_dict else None, timeout=10)
+        d = r.json()
+        ip = d.get("ip")
+        if not ip:
+            return (None, None)
+        loc = ", ".join(x for x in [d.get("country"), d.get("city") or d.get("region")] if x)
+        return (ip, loc if loc else None)
+    except Exception:
+        return (None, None)
+
+
 def parse_fixed_proxy(fixed_proxy: str) -> Optional[Dict[str, str]]:
     """Parse a fixed proxy string into a proxy dict"""
     if not fixed_proxy:
@@ -1458,6 +1479,11 @@ def run_account_core(account_raw: str, index: int) -> Dict[str, Any]:
     register_invite_id(user_id)
     masked = phone[:3] + "****" + phone[7:] if len(phone) >= 7 else phone
     logger.success(f'Account {index + 1}: [{masked}] login succeeded | 🌐 {http.proxy_display}')
+    ip, loc = lookup_egress_ip(http.session.proxies)
+    if ip:
+        logger.info(f'Login egress IP: {ip} ({loc})' if loc else f'Login egress IP: {ip}')
+    else:
+        logger.info('Login egress IP: unavailable')
     time.sleep(random.uniform(1, 3))
     result = {
         'success': True, 'phone': phone, 'index': index,
