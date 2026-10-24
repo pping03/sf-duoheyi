@@ -1486,6 +1486,8 @@ def run_account_core(account_raw: str, index: int) -> Dict[str, Any]:
                     sign_ok, sign_err = daily.sign_in()
                     if sign_ok or '活动太火爆' not in sign_err:
                         break
+        if not sign_ok and '活动太火爆' in sign_err:
+            logger.warning('Sign-in busy after retries: login normal, points on hold until parcel activity resumes [signin_busy_no_parcel]')
         pb, pa = daily.run()
         result['points_before'] = pb
         result['points_after'] = pa
